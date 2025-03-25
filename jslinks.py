@@ -117,7 +117,6 @@ while queue:
             for endpoint in endpoints:
                 if not excluded_extensions.search(endpoint):  # Remove static files
                     if endpoint not in found_endpoints:
-                        print(f"🔗 API Found: {endpoint}")
                         found_endpoints.add(endpoint)
 
                     # Add new API paths to the queue if recursive mode is enabled

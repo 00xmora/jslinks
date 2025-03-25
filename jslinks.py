@@ -2,34 +2,34 @@ import requests
 import re
 import argparse
 import time
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 # Argument parsing
 parser = argparse.ArgumentParser(description="Extract unique API endpoints from JavaScript files recursively.")
 parser.add_argument("-d", "--domain", required=True, help="Target domain (e.g., example.com)")
 parser.add_argument("-r", "--recursive", action="store_true", help="Enable recursive extraction")
+parser.add_argument("-o", "--output", default="endpoints.txt", help="Output file (default: endpoints.txt)")
 args = parser.parse_args()
 
-target_url = f"https://{args.domain}"
+target_domain = args.domain  # Example: "example.com"
+target_url = f"https://{target_domain}"
+output_file = args.output  # Output filename
+
 visited_js = set()
 visited_urls = set()
 queue = [target_url]
 found_endpoints = set()
 
-# Output file
-output_file = "endpoints.txt"
-
-# Regex to extract JavaScript files
+# Regex patterns
 js_pattern = re.compile(r'src=["\'](.*?\.js.*?)["\']', re.IGNORECASE)
 
-# Regex patterns for API endpoint extraction
 endpoint_patterns = [
-    re.compile(r'https?:\/\/[a-zA-Z0-9\-_.]+\/[a-zA-Z0-9\-_/]*'),  # Full URLs
-    re.compile(r'\/[a-zA-Z0-9\-_/]+'),  # Absolute URLs (e.g., /api/auth)
-    re.compile(r'\.\.\/[a-zA-Z0-9\-_/]+'),  # Dotted URLs (e.g., ../api/auth)
-    re.compile(r'[a-zA-Z0-9_\-]+\/[a-zA-Z0-9_\-]+\.[a-zA-Z]+'),  # Relative URLs with slashes (e.g., text/test.php)
-    re.compile(r'[a-zA-Z0-9_\-]+\.[a-zA-Z]+')  # Relative URLs without slashes (e.g., test.php)
+    re.compile(r'https?:\/\/(?:[a-zA-Z0-9-]+\.)*' + re.escape(target_domain) + r'(?:\/[a-zA-Z0-9\-_/]+)?'),  # Full URLs from main domain & subdomains
+    re.compile(r'\/[a-zA-Z0-9\-_/]+(?:\.[a-zA-Z]+)?'),  # Absolute URLs (/api/auth, /index.html)
+    re.compile(r'\.\.\/[a-zA-Z0-9\-_/]+(?:\.[a-zA-Z]+)?'),  # Dotted URLs (../api/auth, ../index.js)
+    re.compile(r'[a-zA-Z0-9_\-]+\/[a-zA-Z0-9_\-]+\.[a-zA-Z]{2,6}'),  # Relative URLs with a valid extension (e.g., .php, .json, .html)
 ]
+
 
 def get_js_files(url):
     """Fetch HTML and extract JavaScript file URLs using regex."""
@@ -64,9 +64,13 @@ def extract_endpoints(js_url, parent_url):
         for pattern in endpoint_patterns:
             matches = pattern.findall(js_content)
             for endpoint in matches:
-                # Resolve relative paths correctly based on parent URL
+                # Convert relative paths to absolute
                 full_endpoint = urljoin(parent_url, endpoint)
-                endpoints.add(full_endpoint)
+
+                # Only keep URLs that contain the target domain or its subdomains
+                parsed_url = urlparse(full_endpoint)
+                if target_domain in parsed_url.netloc:
+                    endpoints.add(full_endpoint)
 
         return endpoints
     except Exception as e:

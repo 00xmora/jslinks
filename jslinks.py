@@ -24,11 +24,18 @@ found_endpoints = set()
 js_pattern = re.compile(r'src=["\'](.*?\.js.*?)["\']', re.IGNORECASE)
 
 endpoint_patterns = [
-    re.compile(r'https?:\/\/(?:[a-zA-Z0-9-]+\.)*' + re.escape(target_domain) + r'(?:\/[a-zA-Z0-9\-_/]+)?'),  # Full URLs from main domain & subdomains
-    re.compile(r'\/[a-zA-Z0-9\-_/]+(?:\.[a-zA-Z]+)?'),  # Absolute URLs (/api/auth, /index.html)
-    re.compile(r'\.\.\/[a-zA-Z0-9\-_/]+(?:\.[a-zA-Z]+)?'),  # Dotted URLs (../api/auth, ../index.js)
-    re.compile(r'[a-zA-Z0-9_\-]+\/[a-zA-Z0-9_\-]+\.[a-zA-Z]{2,6}'),  # Relative URLs with a valid extension (e.g., .php, .json, .html)
+    # Full URLs: Match full URLs under the target domain with at least two path segments
+    re.compile(rf'https?:\/\/(?:[a-zA-Z0-9-]+\.)*{re.escape(target_domain)}(\/[a-zA-Z0-9\-_]+){2,}'),
+
+    # Absolute Paths: Require at least two segments OR ensure single-segment paths are words (not numbers)
+    re.compile(r'\/[a-zA-Z\-_]+(?:\/[a-zA-Z0-9\-_]+)+|\/[a-zA-Z\-_]{4,}'),
+
+    # Relative Filenames: Match important web-related files without a leading slash
+    re.compile(r'(?<!\/)[a-zA-Z0-9_-]+\.(php|asp|jsp|aspx|cfm|cgi|pl|py|rb|do|action)\b', re.IGNORECASE)
 ]
+
+# 4️⃣ Separate filter: Exclude static assets AFTER extracting endpoints
+excluded_extensions = re.compile(r'\.(js|svg|woff|png|jpg|jpeg|gif|css|ico|map|ttf|otf|eot|pdf|xml|rss|txt|zip|tar|gz)$', re.IGNORECASE)
 
 
 def get_js_files(url):
@@ -49,6 +56,7 @@ def get_js_files(url):
     except Exception as e:
         print(f"❌ Error fetching {url}: {e}")
         return []
+
 
 def extract_endpoints(js_url, parent_url):
     """Fetch a JavaScript file and extract possible API endpoints."""
@@ -77,12 +85,14 @@ def extract_endpoints(js_url, parent_url):
         print(f"❌ Error fetching JS file {js_url}: {e}")
         return []
 
+
 def save_results():
     """Save unique and sorted results to a file."""
     with open(output_file, "w") as f:
         for endpoint in sorted(found_endpoints):
             f.write(endpoint + "\n")
     print(f"✅ Results saved in {output_file}")
+
 
 # Recursive processing loop
 while queue:
@@ -106,15 +116,15 @@ while queue:
             endpoints = extract_endpoints(js, current_url)
 
             for endpoint in endpoints:
-                if endpoint not in found_endpoints:
-                    print(f"🔗 API Found: {endpoint}")
-                    found_endpoints.add(endpoint)
+                if not excluded_extensions.search(endpoint):  # Remove static files
+                    if endpoint not in found_endpoints:
+                        print(f"🔗 API Found: {endpoint}")
+                        found_endpoints.add(endpoint)
 
-                # Add new API paths to the queue if recursive mode is enabled
-                if args.recursive and endpoint.startswith(target_url) and endpoint not in visited_urls:
-                    queue.append(endpoint)
+                    # Add new API paths to the queue if recursive mode is enabled
+                    if args.recursive and endpoint.startswith(target_url) and endpoint not in visited_urls:
+                        queue.append(endpoint)
 
-    time.sleep(1)  # Avoid too many requests in a short time
 
 # Save results
 save_results()

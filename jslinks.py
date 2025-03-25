@@ -1,7 +1,6 @@
 import requests
 import re
 import argparse
-import time
 from urllib.parse import urljoin, urlparse
 
 # Argument parsing

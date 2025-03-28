@@ -77,23 +77,23 @@ def extract_endpoints(js_url, parent_url, target_domain):
         js_content = response.text
         endpoints = set()
 
-        full_url_pattern = re.compile(rf'https?:\/\/(?:[a-zA-Z0-9-]+\.)*{re.escape(target_domain)}(\/[a-zA-Z0-9\-_]+){2,}')
-        absolute_path_pattern = re.compile(r'\/[a-zA-Z\-_]+(?:\/[a-zA-Z0-9\-_]+)+|\/[a-zA-Z\-_]{4,}')
-        relative_file_pattern = re.compile(r'(?<!\/)[a-zA-Z0-9_-]+\.(php|asp|jsp|aspx|cfm|cgi|pl|py|rb|do|action)\b', re.IGNORECASE)
-        excluded_extensions = re.compile(r'\.(js|svg|woff|png|jpg|jpeg|gif|css|ico|map|ttf|otf|eot|pdf|xml|rss|txt|zip|tar|gz)$', re.IGNORECASE)
-
-        for pattern in [full_url_pattern, absolute_path_pattern, relative_file_pattern]:
-            matches = pattern.findall(js_content)
-            for endpoint in matches:
-                full_endpoint = urljoin(parent_url, endpoint)
-                if not excluded_extensions.search(full_endpoint):
-                    parsed_url = urlparse(full_endpoint)
-                    if target_domain in parsed_url.netloc:
-                        endpoints.add(full_endpoint)
-        return endpoints
+        # Updated regex patterns for extracting API endpoints and paths, including quoted ones
+        full_url_pattern = re.compile(rf'https?:\/\/(?:[a-zA-Z0-9.-]+)\.{re.escape(target_domain)}(?:\/[a-zA-Z0-9_-]+)*(?:\?[a-zA-Z0-9_-]+=[a-zA-Z0-9_-]+(?:&[a-zA-Z0-9_-]+=[a-zA-Z0-9_-]+)*)?')
+        absolute_path_pattern = re.compile(r'\/(?:api|v\d+|graphql|gql|rest|wp-json|endpoint|service|data|public|private|internal|external)(?:\/[a-zA-Z0-9_-]+)*(?:\?[a-zA-Z0-9_-]+=[a-zA-Z0-9_-]+(?:&[a-zA-Z0-9_-]+=[a-zA-Z0-9_-]+)*)?')        
+        relative_path_pattern = re.compile(r'(?<![\/\w])(?:api|v\d+|graphql|gql|rest|wp-json|endpoint|service|data|public|private|internal|external)(?:\/[a-zA-Z0-9_-]+)*(?:\?[a-zA-Z0-9_-]+=[a-zA-Z0-9_-]+(?:&[a-zA-Z0-9_-]+=[a-zA-Z0-9_-]+)*)?(?![a-zA-Z0-9_-])')
+        quoted_path_pattern = re.compile(r'(["\'])([a-zA-Z][a-zA-Z0-9_-]{2,}\/[a-zA-Z0-9_-]{2,}(?:\/[a-zA-Z0-9_-]+)*(?:\?[a-zA-Z0-9_-]+=[a-zA-Z0-9_-]+(?:&[a-zA-Z0-9_-]+=[a-zA-Z0-9_-]+)*)?)(\1)')
+        path_pattern = re.compile(r'(?:"[^"]*"|\'[^\']*\'|)(?<![\w\/])([a-zA-Z][a-zA-Z0-9_-]{1,}\/[a-zA-Z0-9_-]{3,}(?:\/[a-zA-Z0-9_-]+)*(?:\?[a-zA-Z0-9_-]+=[a-zA-Z0-9_-]+(?:&[a-zA-Z0-9_-]+=[a-zA-Z0-9_-]+)*)?)(?![\w-])')
+        relative_file_pattern = re.compile(r'(?<!\/)([a-zA-Z][a-zA-Z0-9_-]*\.(?:php|asp|jsp|aspx|cfm|cgi|pl|py|rb|do|action))(?:\?[a-zA-Z0-9_-]+=[a-zA-Z0-9_-]+(?:&[a-zA-Z0-9_-]+=[a-zA-Z0-9_-]+)*)?\b', re.IGNORECASE)
+        return set(full_url_pattern.findall(js_content) +
+                   path_pattern.findall(js_content) + 
+                   absolute_path_pattern.findall(js_content) + 
+                   relative_path_pattern.findall(js_content) + 
+                   [match[1] for match in quoted_path_pattern.findall(js_content)] +
+                   relative_file_pattern.findall(js_content))
     except Exception as e:
         print(f"❌ Error fetching JS file {js_url}: {e}")
         return []
+
 
 def save_results():
     """Save unique and sorted results to a file."""
@@ -105,7 +105,11 @@ def save_results():
 # Process each domain
 for domain in domains:
     print(f"🔍 Processing domain: {domain}")
-    target_url = f"https://{domain}"
+    if domain.startswith(("http://", "https://")):
+        target_url = domain
+    else:
+        target_url = f"https://{domain}"  # Default to HTTPS if no scheme is provided
+
     queue = [target_url]
 
     while queue:

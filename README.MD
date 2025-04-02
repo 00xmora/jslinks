@@ -78,8 +78,6 @@ Contributions are welcome! To contribute:
 3. Commit your changes.
 4. Submit a pull request.
 
-## License
-JSLinks is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 Inspired by web reconnaissance tools and workflows.
@@ -87,8 +85,7 @@ Inspired by web reconnaissance tools and workflows.
 ## Contact
 For questions, feedback, or support:
 - Twitter: [@omarsamy10](https://twitter.com/omarsamy10)
-- Linkedin: [omarsamy](www.linkedin.com/in/omar-samy-2b34b3311)
+- Linkedin: [omarsamy](https://www.linkedin.com/in/omar-samy-2b34b3311)
 
-```
+
 Enjoy using JSLinks! 🚀
-```

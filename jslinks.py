@@ -71,8 +71,7 @@ def jslinks(domains=None, domain_list=None, js_file=None, output="endpoints.txt"
     
     urls_to_crawl = []
     if all_domains:
-        urls_to_crawl.extend([f"https://{d}" for d in all_domains if not d.startswith(('http://', 'https://'))] + \
-                            [d for d in all_domains if d.startswith(('http://', 'https://'))])
+        urls_to_crawl.extend([f"https://{d}" if not d.startswith(('http://', 'https://')) else d for d in all_domains])
     if js_file:
         with open(js_file) as f:
             urls_to_crawl.extend(f.read().splitlines())
@@ -80,6 +79,10 @@ def jslinks(domains=None, domain_list=None, js_file=None, output="endpoints.txt"
     if not urls_to_crawl:
         print("❌ No URLs to crawl. Provide at least -d, -l, or -j.")
         return []
+
+    # Assume the first domain is the target if multiple are provided
+    target_domain = urlparse(urls_to_crawl[0]).netloc if urls_to_crawl else ""
+    base_url = f"https://{target_domain}"
 
     found_endpoints = set()
     # Load existing endpoints if file exists
@@ -96,20 +99,34 @@ def jslinks(domains=None, domain_list=None, js_file=None, output="endpoints.txt"
         for js in js_files:
             if js not in visited_js:
                 visited_js.add(js)
+                print(f"📜 Found JS file: {js}")
                 endpoints = extract_endpoints(js, headers)
-                # Normalize endpoints with the JS file's base URL
-                normalized_endpoints = {normalize_endpoint(ep, js) for ep in endpoints}
-                found_endpoints.update(normalized_endpoints)
+                # Filter and normalize endpoints
+                for ep in endpoints:
+                    normalized_ep = normalize_endpoint(ep, base_url)
+                    # Include endpoints that contain the target domain (including subdomains) or are relative paths
+                    if target_domain in normalized_ep:
+                        found_endpoints.add(normalized_ep)
+                    elif ep.startswith('/') and not ep.startswith('//'):
+                        # Handle absolute paths relative to the target domain
+                        full_url = urljoin(base_url, ep)
+                        found_endpoints.add(full_url)
+                    elif not ep.startswith(('http://', 'https://')) and '/' in ep:
+                        # Handle relative paths without protocol
+                        full_url = urljoin(base_url, ep)
+                        if target_domain in full_url:
+                            found_endpoints.add(full_url)
                 if recursive:
-                    for endpoint in normalized_endpoints:
-                        if endpoint.endswith('.js') and endpoint not in visited_js and endpoint not in queue:
-                            queue.append(endpoint)
+                    for endpoint in endpoints:
+                        normalized_recursive = normalize_endpoint(endpoint, base_url)
+                        if endpoint.endswith('.js') and normalized_recursive not in visited_js and normalized_recursive not in queue:
+                            queue.append(normalized_recursive)
         time.sleep(1)
     
     # Sort and write (append mode if file existed, otherwise overwrite)
     with open(output, "w") as f:
         f.write("\n".join(sorted(found_endpoints)))
-    print(f"✅ Results saved in {output} (sorted and deduplicated)")
+    print(f"✅ Results saved in {output} (sorted and deduplicated, only {target_domain} and its subdomains)")
     
     return list(found_endpoints)
 

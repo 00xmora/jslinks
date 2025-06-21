@@ -84,8 +84,8 @@ Inspired by web reconnaissance tools and workflows.
 
 ## Contact
 For questions, feedback, or support:
-- Twitter: [@omarsamy10](https://twitter.com/omarsamy10)
-- Linkedin: [omarsamy](https://www.linkedin.com/in/omar-samy-2b34b3311)
+- Twitter: [@omarsamy10](https://twitter.com/00xmora)
+- Linkedin: [omarsamy](https://www.linkedin.com/in/00xmora)
 
 
 Enjoy using JSLinks! 🚀
